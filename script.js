@@ -57,4 +57,38 @@
   if(config.crm)document.querySelectorAll('[data-crm]').forEach(el=>el.textContent=config.crm);
   if(config.region)document.querySelectorAll('[data-region]').forEach(el=>{el.textContent=config.region;el.hidden=false;});
   document.querySelector('#year').textContent=new Date().getFullYear();
+
+  // Animate once on entry. The default rendering stays visible if JS or motion is unavailable.
+  if (!reduced.matches && 'IntersectionObserver' in window && typeof Element.prototype.animate === 'function') {
+    const animations=new Map();
+    const reveal=new IntersectionObserver(entries=>{
+      entries.forEach(entry=>{
+        if(!entry.isIntersecting)return;
+        const element=entry.target;
+        reveal.unobserve(element);
+        if(reduced.matches || element.contains(document.activeElement))return;
+        const stagger=element.matches('.method-steps li, .area-grid article')
+          ? [...element.parentElement.children].indexOf(element)%2*65 : 0;
+        const animation=element.animate([
+          {opacity:0,transform:'translateY(18px)'},
+          {opacity:1,transform:'translateY(0)'}
+        ],{duration:650,delay:stagger,easing:'cubic-bezier(.22,.68,.25,1)',fill:'backwards'});
+        animations.set(element,animation);
+        animation.onfinish=()=>animations.delete(element);
+        animation.oncancel=()=>animations.delete(element);
+      });
+    },{threshold:0,rootMargin:'0px 0px 35px 0px'});
+    document.querySelectorAll('.section-heading, .services-track, .profile-portrait, .profile-copy, .method .eyebrow, .method h2, .method-steps li, .areas > div:first-child, .area-grid article, .faq > div, .contact-inner > div').forEach(element=>{
+      if(element.getBoundingClientRect().top>innerHeight+35)reveal.observe(element);
+    });
+    document.addEventListener('focusin',event=>{
+      animations.forEach((animation,element)=>{if(element.contains(event.target))animation.cancel();});
+    });
+    reduced.addEventListener('change',()=>{
+      if(reduced.matches){reveal.disconnect();animations.forEach(animation=>animation.cancel());}
+    });
+    window.addEventListener('beforeprint',()=>{
+      reveal.disconnect();animations.forEach(animation=>animation.cancel());
+    });
+  }
 })();
