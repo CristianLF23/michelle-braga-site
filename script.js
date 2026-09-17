@@ -17,7 +17,13 @@
     const max=track.scrollWidth-track.clientWidth;
     controls.querySelector('[data-direction="-1"]').setAttribute('aria-disabled',String(track.scrollLeft<=4));
     controls.querySelector('[data-direction="1"]').setAttribute('aria-disabled',String(track.scrollLeft>=max-4));
-    const nearest=cards.reduce((best,c,i)=>Math.abs(c.offsetLeft-track.offsetLeft-track.scrollLeft)<best.distance?{index:i,distance:Math.abs(c.offsetLeft-track.offsetLeft-track.scrollLeft)}:best,{index:0,distance:Infinity});
+    const bounds=track.getBoundingClientRect();
+    const center=(Math.max(0,bounds.left)+Math.min(innerWidth,bounds.right))/2;
+    const nearest=cards.reduce((best,c,i)=>{
+      const box=c.getBoundingClientRect(), distance=Math.abs(box.left+box.width/2-center);
+      return distance<best.distance?{index:i,distance}:best;
+    },{index:0,distance:Infinity});
+    cards.forEach((card,index)=>card.classList.toggle('is-active',index===nearest.index));
     status.textContent='Serviço '+(nearest.index+1)+' de '+cards.length;
   }
   function go(direction){
@@ -30,7 +36,8 @@
     if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();go(e.key==='ArrowRight'?1:-1);}
     if(e.key==='Home'||e.key==='End'){e.preventDefault();track.scrollTo({left:e.key==='Home'?0:track.scrollWidth,behavior:reduced.matches?'instant':'smooth'});}
   });
-  track.addEventListener('scroll',()=>{clearTimeout(track.scrollTimer);track.scrollTimer=setTimeout(updateCarousel,100);},{passive:true});
+  let carouselFrame=false;
+  track.addEventListener('scroll',()=>{if(!carouselFrame){carouselFrame=true;requestAnimationFrame(()=>{carouselFrame=false;updateCarousel();});}},{passive:true});
   window.addEventListener('resize',updateCarousel,{passive:true});
   updateCarousel();
 
