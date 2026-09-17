@@ -1,91 +1,60 @@
 (() => {
   'use strict';
-  const header = document.querySelector('.site-header');
-  const menu = document.querySelector('.menu-toggle');
-  const nav = document.querySelector('#navigation');
-  const mobile = window.matchMedia('(max-width: 760px)');
-  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const header=document.querySelector('.site-header'), menu=document.querySelector('.menu-toggle'), nav=document.querySelector('#navigation');
+  const mobile=matchMedia('(max-width:760px)'), reduced=matchMedia('(prefers-reduced-motion:reduce)');
   header.classList.add('js-nav');
-  const closeMenu = () => { menu.setAttribute('aria-expanded', 'false'); nav.classList.remove('is-open'); };
-  menu.addEventListener('click', () => {
-    const open = menu.getAttribute('aria-expanded') !== 'true';
-    menu.setAttribute('aria-expanded', String(open));
-    nav.classList.toggle('is-open', open);
-  });
-  nav.addEventListener('click', e => { if (e.target.closest('a')) closeMenu(); });
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && menu.getAttribute('aria-expanded') === 'true') { closeMenu(); menu.focus(); }
-  });
-  document.addEventListener('click', e => { if (!header.contains(e.target)) closeMenu(); });
-  mobile.addEventListener('change', closeMenu);
+  const closeMenu=()=>{menu.setAttribute('aria-expanded','false');nav.classList.remove('is-open');};
+  menu.addEventListener('click',()=>{const open=menu.getAttribute('aria-expanded')!=='true';menu.setAttribute('aria-expanded',String(open));nav.classList.toggle('is-open',open);});
+  nav.addEventListener('click',e=>{if(e.target.closest('a'))closeMenu();});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&menu.getAttribute('aria-expanded')==='true'){closeMenu();menu.focus();}});
+  document.addEventListener('click',e=>{if(!header.contains(e.target))closeMenu();});
+  mobile.addEventListener('change',closeMenu);
 
-  // Native details support keyboard and remain usable with JavaScript disabled.
-  document.querySelectorAll('.service').forEach(detail => {
-    detail.addEventListener('toggle', () => {
-      if (detail.open) document.querySelectorAll('.service').forEach(other => { if (other !== detail) other.open = false; });
+  const track=document.querySelector('#services-track'), cards=[...track.querySelectorAll('.service-card')];
+  const controls=document.querySelector('.carousel-controls'), status=document.querySelector('.carousel-status');
+  controls.hidden=false;
+  function updateCarousel(){
+    const max=track.scrollWidth-track.clientWidth;
+    controls.querySelector('[data-direction="-1"]').setAttribute('aria-disabled',String(track.scrollLeft<=4));
+    controls.querySelector('[data-direction="1"]').setAttribute('aria-disabled',String(track.scrollLeft>=max-4));
+    const nearest=cards.reduce((best,c,i)=>Math.abs(c.offsetLeft-track.offsetLeft-track.scrollLeft)<best.distance?{index:i,distance:Math.abs(c.offsetLeft-track.offsetLeft-track.scrollLeft)}:best,{index:0,distance:Infinity});
+    status.textContent='Serviço '+(nearest.index+1)+' de '+cards.length;
+  }
+  function go(direction){
+    const step=cards[0].getBoundingClientRect().width+parseFloat(getComputedStyle(track).columnGap);
+    track.scrollBy({left:direction*step,behavior:reduced.matches?'instant':'smooth'});
+  }
+  controls.addEventListener('click',e=>{const b=e.target.closest('button');if(b&&b.getAttribute('aria-disabled')!=='true')go(Number(b.dataset.direction));});
+  track.addEventListener('keydown',e=>{
+    if(e.target!==track)return;
+    if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();go(e.key==='ArrowRight'?1:-1);}
+    if(e.key==='Home'||e.key==='End'){e.preventDefault();track.scrollTo({left:e.key==='Home'?0:track.scrollWidth,behavior:reduced.matches?'instant':'smooth'});}
+  });
+  track.addEventListener('scroll',()=>{clearTimeout(track.scrollTimer);track.scrollTimer=setTimeout(updateCarousel,100);},{passive:true});
+  window.addEventListener('resize',updateCarousel,{passive:true});
+  updateCarousel();
+
+  const photo=document.querySelector('.hero-photo img'); let frame=false;
+  function paint(){frame=false;if(mobile.matches||reduced.matches){photo.style.removeProperty('transform');return;}
+    const box=photo.parentElement.getBoundingClientRect();if(box.bottom<0)return;
+    photo.style.transform='translate3d(0,'+Math.min(22,Math.max(-22,-box.top*.04)).toFixed(2)+'px,0)';
+  }
+  function requestPaint(){if(!frame){frame=true;requestAnimationFrame(paint);}}
+  window.addEventListener('scroll',requestPaint,{passive:true});window.addEventListener('resize',requestPaint,{passive:true});reduced.addEventListener('change',requestPaint);paint();
+
+  const config=window.MICHELLE_CONFIG||{};
+  const phone=String(config.whatsapp||'').replace(/\D/g,'');
+  if(/^55\d{10,11}$/.test(phone)){
+    document.querySelectorAll('[data-whatsapp]').forEach(a=>{
+      const message=a.dataset.service?'Olá, Dra. Michelle. Gostaria de informações sobre '+a.dataset.service+'.':config.whatsappMessage;
+      a.href='https://wa.me/'+phone+'?text='+encodeURIComponent(message||'Olá, Dra. Michelle. Gostaria de conversar sobre uma demanda médico-pericial.');
+      a.target='_blank';a.rel='noopener noreferrer';
     });
-  });
-
-  let revealObserver;
-  if ('IntersectionObserver' in window) {
-    revealObserver = new IntersectionObserver(entries => {
-      for (const entry of entries) if (entry.isIntersecting) {
-        entry.target.classList.add('is-visible'); revealObserver.unobserve(entry.target);
-      }
-    }, { threshold: .08 });
-    if (!reduced.matches) document.querySelectorAll('.reveal').forEach(el => {
-      if (el.getBoundingClientRect().top > window.innerHeight) {
-        el.classList.add('reveal-pending'); revealObserver.observe(el);
-      }
-    });
+    document.querySelector('.contact-number').href='tel:+'+phone;
   }
-
-  const photos = [...document.querySelectorAll('.parallax-image')];
-  const progress = document.querySelector('.reading-progress');
-  let scheduled = false;
-  function renderScroll() {
-    scheduled = false;
-    const scrollable = document.documentElement.scrollHeight - window.innerHeight;
-    progress.style.transform = `scaleX(${scrollable > 0 ? Math.min(1, window.scrollY / scrollable) : 0})`;
-    for (const img of photos) {
-      if (mobile.matches || reduced.matches) { img.style.removeProperty('transform'); continue; }
-      const box = img.parentElement.getBoundingClientRect();
-      if (box.bottom < 0 || box.top > window.innerHeight) continue;
-      const distance = (box.top + box.height / 2 - window.innerHeight / 2) * -.06;
-      const limit = box.height * .05;
-      img.style.transform = `translate3d(0,${Math.max(-limit, Math.min(limit, distance)).toFixed(2)}px,0)`;
-    }
-  }
-  function scheduleScroll() { if (!scheduled) { scheduled = true; requestAnimationFrame(renderScroll); } }
-  window.addEventListener('scroll', scheduleScroll, { passive:true });
-  window.addEventListener('resize', scheduleScroll, { passive:true });
-  reduced.addEventListener('change', () => {
-    if (reduced.matches) document.querySelectorAll('.reveal-pending').forEach(el => el.classList.add('is-visible'));
-    scheduleScroll();
-  });
-  renderScroll();
-
-  const config = window.MICHELLE_CONFIG || {};
-  const whatsapp = String(config.whatsapp || '').replace(/\D/g, '');
-  const email = String(config.email || '').trim();
-  function activateContact(type, href, label) {
-    const old = document.querySelector(`[data-contact="${type}"]`);
-    const a = document.createElement('a');
-    a.className = old.className; a.href = href; a.textContent = label;
-    if (type === 'whatsapp') { a.target = '_blank'; a.rel = 'noopener noreferrer'; }
-    old.replaceWith(a);
-  }
-  let active = 0;
-  if (/^55\d{10,11}$/.test(whatsapp)) {
-    activateContact('whatsapp', `https://wa.me/${whatsapp}?text=${encodeURIComponent(config.whatsappMessage || 'Olá. Gostaria de informações sobre a atuação médico-pericial.')}`, 'Conversar pelo WhatsApp');
-    active++;
-  }
-  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    activateContact('email', `mailto:${email}`, 'Enviar e-mail'); active++;
-  }
-  document.querySelector('#contact-status').textContent = active ? 'No primeiro contato, apresente apenas uma breve descrição da demanda.' : 'Canais de contato em breve.';
-  for (const key of ['crm','region']) if (String(config[key] || '').trim()) {
-    document.querySelectorAll(`[data-${key}]`).forEach(el => { el.textContent = String(config[key]).trim(); el.hidden = false; });
-  }
-  document.querySelector('#year').textContent = new Date().getFullYear();
+  const email=String(config.email||'').trim();
+  if(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))document.querySelectorAll('[data-email]').forEach(a=>{a.href='mailto:'+email;a.textContent=email;});
+  if(config.crm)document.querySelectorAll('[data-crm]').forEach(el=>el.textContent=config.crm);
+  if(config.region)document.querySelectorAll('[data-region]').forEach(el=>{el.textContent=config.region;el.hidden=false;});
+  document.querySelector('#year').textContent=new Date().getFullYear();
 })();
